@@ -469,24 +469,10 @@
     deferredPrompt = null;
   });
 
-  // ── Service Worker (inline) ───────────────────────────────
-  if ('serviceWorker' in navigator) {
-    const swCode = `
-      const CACHE = 'partsnap-v1';
-      self.addEventListener('install', e => {
-        self.skipWaiting();
-      });
-      self.addEventListener('activate', e => {
-        e.waitUntil(clients.claim());
-      });
-      self.addEventListener('fetch', e => {
-        e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-      });
-    `;
-    const blob = new Blob([swCode], { type: 'application/javascript' });
-    const swUrl = URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl).catch(() => {});
-  }
+	// ── Service Worker ─────────────────────────────────────────
+	if ('serviceWorker' in navigator) {
+	  navigator.serviceWorker.register('./sw.js').catch(console.error);
+	}
 
   // ── Boot ──────────────────────────────────────────────────
   startCamera();
