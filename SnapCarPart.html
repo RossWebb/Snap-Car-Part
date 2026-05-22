@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0d0d0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PartSnap" />
+  <meta name="description" content="Photograph and catalog spare parts instantly." />
+  <title>PartSnap</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- PWA Manifest (inline as data URI) -->
+  <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUGFydFNuYXAiLCJzaG9ydF9uYW1lIjoiUGFydFNuYXAiLCJkZXNjcmlwdGlvbiI6IlBob3RvZ3JhcGggYW5kIGNhdGFsb2cgc3BhcmUgcGFydHMiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBkMGQwZiIsInRoZW1lX2NvbG9yIjoiIzBkMGQwZiIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUIzYVdSMGFEMGlOVEFpSUdobGFXZG9kRDBpTlRBaUlHWnBiR3c5SW01dmJtVWlJR1pwYkd3dFltRnpaVDBpYlc5dWN5SXZQanh3WVhSb0lHUTlJazB3SURBbFRpNHdJREF1TUNBd0lEQWdNQ0JPSWlCelpXeGxZM1E5SWpZd01EQXdJREV5TURBd0lEWXdNREFpSUdacGJHd3RkbVZ5WlhNOUluTm9ZWEpsSWlCelpXeGxZM1F0WW14dmF5MDFJakl3SWlCbWIyNTBMV1poYldsc2VUMGliV0Z1WVdkbElpQm1iMjUwTFdadlluSmxjRzk4YlcxaGRHbHZiajBpVkdWemRDQmhiaUJsZUhCc1lYa2dkR2hsSWlBK1BDOXdZWFJvUGp3dmMzWm5QZz09Iiwic2l6ZXMiOiI1MHg1MCIsInR5cGUiOiJpbWFnZS9zdmcreG1sIn1dfQ=="/>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0d0f;
+      --surface:   #17171c;
+      --surface2:  #1f1f27;
+      --border:    #2a2a35;
+      --accent:    #f0c040;
+      --accent2:   #ff6b35;
+      --text:      #e8e8ee;
+      --muted:     #6b6b7e;
+      --success:   #3ddc84;
+      --danger:    #ff4d4d;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html, body {
+      height: 100%; width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-head);
+      overflow: hidden;
+    }
+
+    /* ── APP SHELL ── */
+    #app {
+      display: flex; flex-direction: column;
+      height: 100dvh; width: 100%;
+      position: relative; overflow: hidden;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      z-index: 10; flex-shrink: 0;
+    }
+    .logo {
+      font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .logo-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); display: inline-block;
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    #install-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); font-family: var(--font-mono); font-size: 11px;
+      padding: 6px 12px; border-radius: 6px; cursor: pointer;
+      transition: all .2s; letter-spacing: .5px; display: flex;
+      align-items: center; gap: 6px;
+    }
+    #install-btn:hover { border-color: var(--accent); color: var(--accent); }
+    #install-btn.hidden { display: none; }
+
+    /* ── SCREENS ── */
+    .screen {
+      flex: 1; display: flex; flex-direction: column;
+      overflow: hidden; position: relative;
+    }
+    .screen.hidden { display: none !important; }
+
+    /* ── CAMERA SCREEN ── */
+    #camera-screen {
+      background: #000;
+    }
+    #video {
+      width: 100%; height: 100%; object-fit: cover;
+      display: block;
+    }
+    .camera-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      justify-content: space-between;
+      padding: 24px 24px 40px;
+      pointer-events: none;
+    }
+    .viewfinder {
+      position: absolute; inset: 20%;
+      border: 2px solid rgba(240,192,64,.45);
+      border-radius: 6px;
+    }
+    .viewfinder::before, .viewfinder::after,
+    .viewfinder span::before, .viewfinder span::after {
+      content: ''; position: absolute;
+      width: 20px; height: 20px;
+      border-color: var(--accent); border-style: solid;
+    }
+    .viewfinder::before  { top: -2px; left: -2px;  border-width: 3px 0 0 3px; }
+    .viewfinder::after   { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
+    .viewfinder span::before { bottom: -2px; left: -2px;  border-width: 0 0 3px 3px; }
+    .viewfinder span::after  { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+
+    .cam-hint {
+      text-align: center; font-family: var(--font-mono);
+      font-size: 11px; color: rgba(255,255,255,.6);
+      letter-spacing: 1px; text-transform: uppercase;
+    }
+    .cam-controls {
+      display: flex; justify-content: center; align-items: center; gap: 32px;
+      pointer-events: all;
+    }
+    #shutter-btn {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: #fff; border: 4px solid rgba(255,255,255,.3);
+      cursor: pointer; position: relative;
+      box-shadow: 0 0 0 6px rgba(255,255,255,.12);
+      transition: transform .12s, box-shadow .12s;
+    }
+    #shutter-btn:active { transform: scale(.93); box-shadow: 0 0 0 3px rgba(255,255,255,.1); }
+
+    #flip-btn {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(255,255,255,.12); border: none;
+      color: #fff; font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px);
+      transition: transform .3s;
+    }
+    #flip-btn:active { transform: rotate(180deg); }
+
+    /* flash */
+    .flash-overlay {
+      position: absolute; inset: 0; background: #fff;
+      opacity: 0; pointer-events: none;
+      animation: none;
+    }
+    .flash-overlay.flash { animation: flash .35s ease-out forwards; }
+    @keyframes flash { 0%{opacity:1} 100%{opacity:0} }
+
+    /* ── CANVAS (hidden) ── */
+    canvas { display: none; }
+
+    /* ── ID ENTRY SCREEN ── */
+    #id-screen {
+      background: var(--bg);
+      justify-content: flex-start;
+      padding: 0;
+    }
+    .id-inner {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 24px 24px 40px;
+      gap: 20px; overflow-y: auto;
+    }
+    .preview-wrap {
+      position: relative; border-radius: 12px; overflow: hidden;
+      flex-shrink: 0; max-height: 260px;
+      border: 1px solid var(--border);
+    }
+    #preview-img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .preview-badge {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(13,13,15,.8); border: 1px solid var(--border);
+      border-radius: 4px; padding: 4px 8px;
+      font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+      letter-spacing: .5px; backdrop-filter: blur(6px);
+    }
+    .retake-btn {
+      position: absolute; top: 10px; right: 10px;
+      background: rgba(13,13,15,.8); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 10px; cursor: pointer;
+      font-family: var(--font-head); font-size: 12px; font-weight: 600;
+      color: var(--text); display: flex; align-items: center; gap: 5px;
+      transition: border-color .2s; backdrop-filter: blur(6px);
+    }
+    .retake-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    .field-label {
+      font-size: 11px; font-family: var(--font-mono); letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+    }
+    #part-id-input {
+      width: 100%; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px 18px; font-family: var(--font-mono); font-size: 18px;
+      font-weight: 500; color: var(--text); outline: none;
+      transition: border-color .2s, box-shadow .2s; letter-spacing: 1px;
+    }
+    #part-id-input::placeholder { color: var(--muted); }
+    #part-id-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(240,192,64,.15);
+    }
+    .input-hint {
+      font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .save-btn {
+      width: 100%; padding: 18px; border: none; border-radius: 10px;
+      background: var(--accent); color: #0d0d0f;
+      font-family: var(--font-head); font-size: 16px; font-weight: 800;
+      letter-spacing: .5px; cursor: pointer;
+      transition: opacity .2s, transform .12s;
+      margin-top: auto;
+    }
+    .save-btn:hover { opacity: .9; }
+    .save-btn:active { transform: scale(.98); }
+    .save-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── SUCCESS TOAST ── */
+    #toast {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--surface2); border: 1px solid var(--success);
+      border-radius: 10px; padding: 12px 20px;
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--font-mono); font-size: 13px; color: var(--success);
+      opacity: 0; transition: all .3s; pointer-events: none; z-index: 100;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── NO CAMERA ── */
+    .no-cam {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      padding: 32px; text-align: center;
+    }
+    .no-cam-icon { font-size: 48px; }
+    .no-cam h2 { font-size: 18px; font-weight: 700; }
+    .no-cam p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+    .retry-cam { background: var(--accent); color: #0d0d0f; border: none;
+      padding: 12px 24px; border-radius: 8px; font-family: var(--font-head);
+      font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+
+    /* scan line animation on viewfinder */
+    @keyframes scan { 0%{top:10%} 100%{top:90%} }
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      top: 50%; animation: scan 2.4s ease-in-out infinite alternate;
+      opacity: .6;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo"><span class="logo-dot"></span>PartSnap</div>
+    <button id="install-btn" class="hidden">⬇ Install App</button>
+  </header>
+
+  <!-- CAMERA SCREEN -->
+  <div class="screen" id="camera-screen">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="flash-overlay" id="flash"></div>
+    <div class="camera-overlay">
+      <div class="viewfinder"><span></span><div class="scan-line"></div></div>
+      <p class="cam-hint">Position part within frame</p>
+      <div class="cam-controls">
+        <button id="flip-btn" title="Flip camera">⟳</button>
+        <button id="shutter-btn" title="Take photo"></button>
+        <div style="width:44px"></div>
+      </div>
+    </div>
+    <div class="no-cam hidden" id="no-cam">
+      <div class="no-cam-icon">📷</div>
+      <h2>Camera Access Needed</h2>
+      <p>PartSnap needs camera access to photograph spare parts. Please allow camera permissions and try again.</p>
+      <button class="retry-cam" id="retry-cam-btn">Try Again</button>
+    </div>
+  </div>
+
+  <!-- ID ENTRY SCREEN -->
+  <div class="screen hidden" id="id-screen">
+    <div class="id-inner">
+      <div class="preview-wrap">
+        <img id="preview-img" src="" alt="Part photo" />
+        <span class="preview-badge">CAPTURED</span>
+        <button class="retake-btn" id="retake-btn">↩ Retake</button>
+      </div>
+
+      <div>
+        <p class="field-label">Part ID / SKU</p>
+        <input id="part-id-input" type="text" placeholder="e.g. HYD-4450-A" autocomplete="off" spellcheck="false" autocorrect="off" />
+        <p class="input-hint">This will become the filename of the saved photo.</p>
+      </div>
+
+      <button class="save-btn" id="save-btn" disabled>Save Part Photo</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">✓ <span id="toast-msg"></span></div>
+
+<script>
+  // ── State ─────────────────────────────────────────────────
+  let stream = null;
+  let facingMode = 'environment';
+  let capturedBlob = null;
+  let deferredPrompt = null;
+
+  const video       = document.getElementById('video');
+  const canvas      = document.getElementById('canvas');
+  const flash       = document.getElementById('flash');
+  const shutterBtn  = document.getElementById('shutter-btn');
+  const flipBtn     = document.getElementById('flip-btn');
+  const camScreen   = document.getElementById('camera-screen');
+  const idScreen    = document.getElementById('id-screen');
+  const previewImg  = document.getElementById('preview-img');
+  const retakeBtn   = document.getElementById('retake-btn');
+  const partIdInput = document.getElementById('part-id-input');
+  const saveBtn     = document.getElementById('save-btn');
+  const installBtn  = document.getElementById('install-btn');
+  const noCam       = document.getElementById('no-cam');
+  const toast       = document.getElementById('toast');
+  const toastMsg    = document.getElementById('toast-msg');
+
+  // ── Camera ────────────────────────────────────────────────
+  async function startCamera() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      video.style.display = 'block';
+      noCam.classList.add('hidden');
+    } catch (err) {
+      console.error('Camera error:', err);
+      video.style.display = 'none';
+      noCam.classList.remove('hidden');
+    }
+  }
+
+  flipBtn.addEventListener('click', () => {
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    startCamera();
+  });
+
+  document.getElementById('retry-cam-btn').addEventListener('click', startCamera);
+
+  // ── Capture ───────────────────────────────────────────────
+  shutterBtn.addEventListener('click', () => {
+    if (!stream) return;
+
+    // Flash effect
+    flash.classList.remove('flash');
+    void flash.offsetWidth;
+    flash.classList.add('flash');
+
+    // Draw frame to canvas
+    const vw = video.videoWidth  || 1280;
+    const vh = video.videoHeight || 720;
+    canvas.width  = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext('2d');
+
+    // Flip horizontally for front camera
+    if (facingMode === 'user') {
+      ctx.translate(vw, 0); ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, vw, vh);
+
+    canvas.toBlob(blob => {
+      capturedBlob = blob;
+      const url = URL.createObjectURL(blob);
+      previewImg.src = url;
+      showIdScreen();
+    }, 'image/jpeg', 0.92);
+  });
+
+  // ── Screen transitions ────────────────────────────────────
+  function showIdScreen() {
+    camScreen.classList.add('hidden');
+    idScreen.classList.remove('hidden');
+    partIdInput.value = '';
+    saveBtn.disabled = true;
+    setTimeout(() => partIdInput.focus(), 300);
+  }
+
+  function showCamScreen() {
+    idScreen.classList.add('hidden');
+    camScreen.classList.remove('hidden');
+    if (previewImg.src) URL.revokeObjectURL(previewImg.src);
+    capturedBlob = null;
+  }
+
+  retakeBtn.addEventListener('click', showCamScreen);
+
+  // ── Part ID input ─────────────────────────────────────────
+  partIdInput.addEventListener('input', () => {
+    saveBtn.disabled = partIdInput.value.trim().length === 0;
+  });
+
+  partIdInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !saveBtn.disabled) saveBtn.click();
+  });
+
+  // ── Save / Download ───────────────────────────────────────
+  saveBtn.addEventListener('click', () => {
+    if (!capturedBlob || !partIdInput.value.trim()) return;
+
+    const rawId   = partIdInput.value.trim();
+    // Sanitise: replace any character that's not alphanumeric, dash, underscore, or dot
+    const safeId  = rawId.replace(/[^a-zA-Z0-9\-_.]/g, '_');
+    const filename = `${safeId}.jpg`;
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(capturedBlob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+    showToast(`Saved as ${filename}`);
+
+    // Reset after short delay
+    setTimeout(() => {
+      showCamScreen();
+    }, 1800);
+  });
+
+  // ── Toast ─────────────────────────────────────────────────
+  function showToast(msg) {
+    toastMsg.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2800);
+  }
+
+  // ── PWA Install ───────────────────────────────────────────
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.classList.remove('hidden');
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      installBtn.classList.add('hidden');
+    }
+    deferredPrompt = null;
+  });
+
+  window.addEventListener('appinstalled', () => {
+    installBtn.classList.add('hidden');
+    deferredPrompt = null;
+  });
+
+  // ── Service Worker (inline) ───────────────────────────────
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+      const CACHE = 'partsnap-v1';
+      self.addEventListener('install', e => {
+        self.skipWaiting();
+      });
+      self.addEventListener('activate', e => {
+        e.waitUntil(clients.claim());
+      });
+      self.addEventListener('fetch', e => {
+        e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+      });
+    `;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl).catch(() => {});
+  }
+
+  // ── Boot ──────────────────────────────────────────────────
+  startCamera();
+</script>
+</body>
+</html>
