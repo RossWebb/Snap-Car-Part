@@ -14,6 +14,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="manifest" href="./manifest.json" />
 
+  <!-- ── Install prompt must be caught EARLY, before module scripts parse ── -->
+  <script>
+    window.deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      window.deferredPrompt = e;
+      const btn = document.getElementById('install-btn');
+      if (btn) btn.classList.remove('hidden');
+    });
+    window.addEventListener('appinstalled', () => {
+      window.deferredPrompt = null;
+      const btn = document.getElementById('install-btn');
+      if (btn) btn.classList.add('hidden');
+    });
+  </script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -37,14 +53,12 @@
       min-height: 100dvh;
       width: 100%;
     }
-
     html, body {
       height: 100%;
       color: var(--text);
       font-family: var(--font-head);
       overflow: hidden;
     }
-
     #app {
       display: flex; flex-direction: column;
       height: 100dvh;
@@ -159,18 +173,29 @@
 
     /* ── NO CAMERA ── */
     .no-cam {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 16px;
-      padding: 32px; text-align: center;
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; padding: 36px; text-align: center;
+      background: var(--bg);
     }
-    .no-cam-icon { font-size: 48px; }
-    .no-cam h2 { font-size: 18px; font-weight: 700; }
-    .no-cam p { font-size: 14px; color: var(--muted); line-height: 1.6; }
-    .retry-cam {
-      background: var(--accent); color: #0d0d0f; border: none;
-      padding: 12px 24px; border-radius: 8px; font-family: var(--font-head);
-      font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px;
+    .no-cam.hidden { display: none; }
+    .no-cam-icon { font-size: 52px; }
+    .no-cam h2 { font-size: 20px; font-weight: 800; }
+    .no-cam p  { font-size: 14px; color: var(--muted); line-height: 1.65; max-width: 300px; }
+    .no-cam-btn {
+      width: 100%; max-width: 280px;
+      padding: 14px 20px; border-radius: 8px;
+      font-family: var(--font-head); font-size: 14px; font-weight: 700;
+      cursor: pointer; border: none; transition: opacity .2s;
     }
+    .no-cam-btn:hover { opacity: .85; }
+    .no-cam-btn.primary { background: var(--accent); color: #0d0d0f; }
+    .no-cam-btn.secondary {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .no-cam-btn.hidden { display: none; }
 
     /* ── ID ENTRY SCREEN ── */
     #id-screen { background: var(--bg); }
@@ -186,7 +211,6 @@
       border: 1px solid var(--border);
       background: #111;
     }
-    /* checkerboard shown when bg is removed */
     .preview-wrap.transparent-bg {
       background-image:
         linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
@@ -217,7 +241,7 @@
     }
     .retake-btn:hover { border-color: var(--accent2); color: var(--accent2); }
 
-    /* ── BG REMOVAL ROW ── */
+    /* BG removal row */
     .bg-row {
       display: flex; gap: 10px; align-items: stretch;
     }
@@ -247,9 +271,7 @@
     #undo-btn:hover { border-color: var(--accent2); color: var(--accent2); }
 
     /* Progress bar */
-    .bg-progress {
-      display: none; flex-direction: column; gap: 6px;
-    }
+    .bg-progress { display: none; flex-direction: column; gap: 6px; }
     .bg-progress.visible { display: flex; }
     .bg-progress-label {
       font-family: var(--font-mono); font-size: 10px;
@@ -295,11 +317,11 @@
       transition: opacity .2s, transform .12s;
       margin-top: auto;
     }
-    .save-btn:hover { opacity: .9; }
+    .save-btn:hover  { opacity: .9; }
     .save-btn:active { transform: scale(.98); }
     .save-btn:disabled { opacity: .4; cursor: not-allowed; }
 
-    /* ── TOAST ── */
+    /* Toast */
     #toast {
       position: fixed; bottom: 32px; left: 50%;
       transform: translateX(-50%) translateY(20px);
@@ -335,11 +357,14 @@
         <div style="width:44px"></div>
       </div>
     </div>
+
+    <!-- No-camera overlay — shown instead of camera controls when access fails -->
     <div class="no-cam hidden" id="no-cam">
       <div class="no-cam-icon">📷</div>
       <h2>Camera Access Needed</h2>
-      <p>PartSnap needs camera access to photograph spare parts. Please allow camera permissions and try again.</p>
-      <button class="retry-cam" id="retry-cam-btn">Try Again</button>
+      <p id="no-cam-msg">PartSnap needs camera access to photograph spare parts. Tap below to try again.</p>
+      <button class="no-cam-btn primary" id="retry-cam-btn">Try Again</button>
+      <button class="no-cam-btn secondary hidden" id="open-settings-btn">Open App Settings ↗</button>
     </div>
   </div>
 
@@ -347,14 +372,12 @@
   <div class="screen hidden" id="id-screen">
     <div class="id-inner">
 
-      <!-- Photo preview -->
       <div class="preview-wrap" id="preview-wrap">
         <img id="preview-img" src="" alt="Part photo" />
         <span class="preview-badge" id="preview-badge">CAPTURED</span>
         <button class="retake-btn" id="retake-btn">↩ Retake</button>
       </div>
 
-      <!-- Background removal -->
       <div class="bg-row">
         <button id="bg-remove-btn">✂ Remove Background</button>
         <button id="undo-btn">↩ Undo</button>
@@ -366,7 +389,6 @@
         </div>
       </div>
 
-      <!-- Part ID -->
       <div>
         <p class="field-label">Part ID / SKU</p>
         <input id="part-id-input" type="text" placeholder="e.g. HYD-4450-A"
@@ -385,37 +407,39 @@
   import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm';
 
   // ── State ─────────────────────────────────────────────────
-  let stream         = null;
-  let facingMode     = 'environment';
-  let originalBlob   = null;   // raw JPEG from camera
-  let currentBlob    = null;   // current blob (may be bg-removed PNG)
-  let bgRemoved      = false;
-  let deferredPrompt = null;
+  let stream       = null;
+  let facingMode   = 'environment';
+  let originalBlob = null;
+  let currentBlob  = null;
+  let bgRemoved    = false;
 
   // ── DOM refs ──────────────────────────────────────────────
-  const video            = document.getElementById('video');
-  const canvas           = document.getElementById('canvas');
-  const flash            = document.getElementById('flash');
-  const shutterBtn       = document.getElementById('shutter-btn');
-  const flipBtn          = document.getElementById('flip-btn');
-  const camScreen        = document.getElementById('camera-screen');
-  const idScreen         = document.getElementById('id-screen');
-  const previewWrap      = document.getElementById('preview-wrap');
-  const previewImg       = document.getElementById('preview-img');
-  const previewBadge     = document.getElementById('preview-badge');
-  const retakeBtn        = document.getElementById('retake-btn');
-  const partIdInput      = document.getElementById('part-id-input');
-  const filenamePreview  = document.getElementById('filename-preview');
-  const saveBtn          = document.getElementById('save-btn');
-  const installBtn       = document.getElementById('install-btn');
-  const noCam            = document.getElementById('no-cam');
-  const bgRemoveBtn      = document.getElementById('bg-remove-btn');
-  const undoBtn          = document.getElementById('undo-btn');
-  const bgProgress       = document.getElementById('bg-progress');
-  const bgProgressLabel  = document.getElementById('bg-progress-label');
-  const bgProgressFill   = document.getElementById('bg-progress-fill');
-  const toast            = document.getElementById('toast');
-  const toastMsg         = document.getElementById('toast-msg');
+  const video           = document.getElementById('video');
+  const canvas          = document.getElementById('canvas');
+  const flash           = document.getElementById('flash');
+  const shutterBtn      = document.getElementById('shutter-btn');
+  const flipBtn         = document.getElementById('flip-btn');
+  const camScreen       = document.getElementById('camera-screen');
+  const idScreen        = document.getElementById('id-screen');
+  const previewWrap     = document.getElementById('preview-wrap');
+  const previewImg      = document.getElementById('preview-img');
+  const previewBadge    = document.getElementById('preview-badge');
+  const retakeBtn       = document.getElementById('retake-btn');
+  const partIdInput     = document.getElementById('part-id-input');
+  const filenamePreview = document.getElementById('filename-preview');
+  const saveBtn         = document.getElementById('save-btn');
+  const installBtn      = document.getElementById('install-btn');
+  const noCam           = document.getElementById('no-cam');
+  const noCamMsg        = document.getElementById('no-cam-msg');
+  const retryCamBtn     = document.getElementById('retry-cam-btn');
+  const openSettingsBtn = document.getElementById('open-settings-btn');
+  const bgRemoveBtn     = document.getElementById('bg-remove-btn');
+  const undoBtn         = document.getElementById('undo-btn');
+  const bgProgress      = document.getElementById('bg-progress');
+  const bgProgressLabel = document.getElementById('bg-progress-label');
+  const bgProgressFill  = document.getElementById('bg-progress-fill');
+  const toast           = document.getElementById('toast');
+  const toastMsg        = document.getElementById('toast-msg');
 
   // ── Camera ────────────────────────────────────────────────
   async function startCamera() {
@@ -432,6 +456,15 @@
       console.error('Camera error:', err);
       video.style.display = 'none';
       noCam.classList.remove('hidden');
+
+      const isDenied = err.name === 'NotAllowedError';
+      if (isDenied) {
+        noCamMsg.textContent = 'Camera permission was denied. Please enable it in your device settings, then relaunch the app.';
+        openSettingsBtn.classList.remove('hidden');
+      } else {
+        noCamMsg.textContent = 'Could not access the camera. Please check your device and try again.';
+        openSettingsBtn.classList.add('hidden');
+      }
     }
   }
 
@@ -439,7 +472,23 @@
     facingMode = facingMode === 'environment' ? 'user' : 'environment';
     startCamera();
   });
-  document.getElementById('retry-cam-btn').addEventListener('click', startCamera);
+
+  retryCamBtn.addEventListener('click', startCamera);
+
+  // Deep-link to Android app settings; falls back gracefully on other platforms
+  openSettingsBtn.addEventListener('click', () => {
+    // Try Android intent first
+    const intent = 'intent://settings#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;end';
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+    try {
+      iframe.contentWindow.location.href = intent;
+    } catch(e) {}
+    setTimeout(() => document.body.removeChild(iframe), 500);
+    // Also try the generic app-settings URI (iOS / some Android browsers)
+    setTimeout(() => { window.location.href = 'app-settings:'; }, 50);
+  });
 
   // ── Capture ───────────────────────────────────────────────
   shutterBtn.addEventListener('click', () => {
@@ -487,13 +536,17 @@
     idScreen.classList.add('hidden');
     camScreen.classList.remove('hidden');
     if (previewImg._url) URL.revokeObjectURL(previewImg._url);
-    originalBlob = null; currentBlob = null;
+    originalBlob = null;
+    currentBlob  = null;
   }
 
   retakeBtn.addEventListener('click', showCamScreen);
 
-  // ── Part ID input ─────────────────────────────────────────
+  // ── Part ID / filename ────────────────────────────────────
   partIdInput.addEventListener('input', updateFilename);
+  partIdInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !saveBtn.disabled) saveBtn.click();
+  });
 
   function updateFilename() {
     const raw = partIdInput.value.trim();
@@ -506,26 +559,21 @@
     }
   }
 
-  partIdInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !saveBtn.disabled) saveBtn.click();
-  });
-
   // ── Background Removal ────────────────────────────────────
   bgRemoveBtn.addEventListener('click', async () => {
     if (!originalBlob) return;
-
     bgRemoveBtn.disabled = true;
     bgRemoveBtn.textContent = '⏳ Processing…';
     bgProgress.classList.add('visible');
     bgProgressLabel.textContent = 'Loading model…';
-    bgProgressFill.style.width = '0%';
+    bgProgressFill.style.width  = '0%';
 
     try {
       const resultBlob = await removeBackground(originalBlob, {
         progress: (key, current, total) => {
           const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-          bgProgressFill.style.width = pct + '%';
-          bgProgressLabel.textContent = key.includes('fetch') || key.includes('load')
+          bgProgressFill.style.width  = pct + '%';
+          bgProgressLabel.textContent = (key.includes('fetch') || key.includes('load'))
             ? `Loading model… ${pct}%`
             : `Removing background… ${pct}%`;
         }
@@ -536,14 +584,13 @@
       setPreview(resultBlob);
       previewWrap.classList.add('transparent-bg');
       previewBadge.textContent = 'BG REMOVED';
-      bgRemoveBtn.textContent  = '✂ Background Removed';
+      bgRemoveBtn.textContent  = '✓ Background Removed';
       bgRemoveBtn.classList.add('done');
       bgRemoveBtn.disabled = true;
       undoBtn.classList.add('visible');
       bgProgress.classList.remove('visible');
       updateFilename();
       showToast('Background removed ✓');
-
     } catch (err) {
       console.error(err);
       bgProgress.classList.remove('visible');
@@ -597,22 +644,13 @@
     setTimeout(() => toast.classList.remove('show'), 2800);
   }
 
-  // ── PWA Install ───────────────────────────────────────────
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.classList.remove('hidden');
-  });
+  // ── Install button click (prompt stored on window by early script) ─
   installBtn.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    if (!window.deferredPrompt) return;
+    window.deferredPrompt.prompt();
+    const { outcome } = await window.deferredPrompt.userChoice;
     if (outcome === 'accepted') installBtn.classList.add('hidden');
-    deferredPrompt = null;
-  });
-  window.addEventListener('appinstalled', () => {
-    installBtn.classList.add('hidden');
-    deferredPrompt = null;
+    window.deferredPrompt = null;
   });
 
   // ── Service Worker ────────────────────────────────────────
