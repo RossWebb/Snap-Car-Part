@@ -67,14 +67,23 @@
       box-shadow: 0 0 10px var(--accent);
     }
 
-    #install-btn {
-      background: transparent; border: 1px solid var(--border);
-      color: var(--muted); font-family: var(--font-mono); font-size: 11px;
-      padding: 6px 12px; border-radius: 6px; cursor: pointer;
-      transition: all .2s; letter-spacing: .5px; display: flex;
-      align-items: center; gap: 6px;
-    }
-    #install-btn:hover { border-color: var(--accent); color: var(--accent); }
+	#install-btn {
+	  background: var(--accent);        /* gold fill instead of transparent */
+	  border: none;
+	  color: #0d0d0f;                   /* dark text on gold */
+	  font-family: var(--font-mono);
+	  font-size: 12px;
+	  font-weight: 700;
+	  padding: 8px 14px;
+	  border-radius: 6px;
+	  cursor: pointer;
+	  letter-spacing: .5px;
+	  display: flex;
+	  align-items: center;
+	  gap: 6px;
+	  transition: opacity .2s;
+	}
+	#install-btn:hover { opacity: .85; }
     #install-btn.hidden { display: none; }
 
     /* ── SCREENS ── */
@@ -263,7 +272,7 @@
 <div id="app">
   <header>
     <div class="logo"><span class="logo-dot"></span>PartSnap</div>
-    <button id="install-btn" class="hidden">⬇ Install App</button>
+    <button id="install-btn" class="hidden">Install PartSnap ⬇</button>
   </header>
 
   <!-- CAMERA SCREEN -->
