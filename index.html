@@ -645,13 +645,24 @@
   }
 
   // ── Install button click (prompt stored on window by early script) ─
-  installBtn.addEventListener('click', async () => {
-    if (!window.deferredPrompt) return;
-    window.deferredPrompt.prompt();
-    const { outcome } = await window.deferredPrompt.userChoice;
-    if (outcome === 'accepted') installBtn.classList.add('hidden');
-    window.deferredPrompt = null;
+installBtn.addEventListener('click', () => {
+  if (!window.deferredPrompt) {
+    console.log('No deferred prompt available');
+    return;
+  }
+  const p = window.deferredPrompt;
+  window.deferredPrompt = null;
+  installBtn.classList.add('hidden');
+  p.prompt();
+  p.userChoice.then(choice => {
+    console.log('Install outcome:', choice.outcome);
+    if (choice.outcome !== 'accepted') {
+      // User declined — show button again
+      installBtn.classList.remove('hidden');
+      window.deferredPrompt = p; // restore it
+    }
   });
+});
 
   // ── Service Worker ────────────────────────────────────────
   if ('serviceWorker' in navigator) {
