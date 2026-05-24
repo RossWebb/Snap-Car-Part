@@ -14,7 +14,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="manifest" href="./manifest.json" />
 
-  <!-- Catch install prompt as early as possible, before any deferred scripts -->
+  <!-- BG removal library loaded as plain UMD script — no modules, works in all PWA contexts -->
+  <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/background-removal.js"></script>
+
+  <!-- Catch install prompt early, before any deferred scripts -->
   <script>
     window.deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', function(e) {
@@ -387,7 +390,6 @@
 
 <div id="toast"><span id="toast-msg"></span></div>
 
-<!-- Regular script — NOT type="module". Dynamic import() used only for bg removal. -->
 <script>
   // ── State ─────────────────────────────────────────────────
   var stream       = null;
@@ -395,7 +397,6 @@
   var originalBlob = null;
   var currentBlob  = null;
   var bgRemoved    = false;
-  var bgLib        = null; // loaded on demand
 
   // ── DOM refs ──────────────────────────────────────────────
   var video           = document.getElementById('video');
@@ -459,7 +460,6 @@
   retryCamBtn.addEventListener('click', startCamera);
 
   openSettingsBtn.addEventListener('click', function() {
-    // Android deep-link to app permissions settings
     window.location.href = 'intent://settings#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;end';
   });
 
@@ -532,29 +532,33 @@
     }
   }
 
-  // ── Background Removal (library loaded on demand) ─────────
+  // ── Background Removal ────────────────────────────────────
   bgRemoveBtn.addEventListener('click', function() {
     if (!originalBlob) return;
+
+    // Check the UMD library loaded correctly
+    var imgly = window.ImglyBackgroundRemoval || (window['@imgly/background-removal']);
+    var removeFn = imgly && (imgly.removeBackground || imgly.default);
+
+    if (typeof removeFn !== 'function') {
+      showToast('BG removal unavailable — check connection', true);
+      return;
+    }
+
     bgRemoveBtn.disabled = true;
-    bgRemoveBtn.textContent = '⏳ Loading…';
+    bgRemoveBtn.textContent = '⏳ Processing…';
     bgProgress.classList.add('visible');
     bgProgressLabel.textContent = 'Loading model…';
     bgProgressFill.style.width = '0%';
 
-    // Dynamically import the library only when needed
-    var libUrl = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm';
-    import(libUrl).then(function(mod) {
-      bgLib = mod.removeBackground;
-      bgProgressLabel.textContent = 'Removing background…';
-      return bgLib(originalBlob, {
-        progress: function(key, current, total) {
-          var pct = total > 0 ? Math.round((current / total) * 100) : 0;
-          bgProgressFill.style.width = pct + '%';
-          bgProgressLabel.textContent = (key.indexOf('fetch') >= 0 || key.indexOf('load') >= 0)
-            ? 'Loading model… ' + pct + '%'
-            : 'Removing background… ' + pct + '%';
-        }
-      });
+    removeFn(originalBlob, {
+      progress: function(key, current, total) {
+        var pct = total > 0 ? Math.round((current / total) * 100) : 0;
+        bgProgressFill.style.width = pct + '%';
+        bgProgressLabel.textContent = (key.indexOf('fetch') >= 0 || key.indexOf('load') >= 0)
+          ? 'Loading model… ' + pct + '%'
+          : 'Removing background… ' + pct + '%';
+      }
     }).then(function(resultBlob) {
       currentBlob = resultBlob;
       bgRemoved   = true;
