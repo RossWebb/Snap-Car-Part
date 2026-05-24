@@ -537,8 +537,8 @@
     if (!originalBlob) return;
 
     // Check the UMD library loaded correctly
-    var imgly = window.ImglyBackgroundRemoval || (window['@imgly/background-removal']);
-    var removeFn = imgly && (imgly.removeBackground || imgly.default);
+    vvar imgly = window.BackgroundRemoval;
+	var removeFn = imgly && imgly.removeBackground;
 
     if (typeof removeFn !== 'function') {
       showToast('BG removal unavailable — check connection', true);
@@ -552,6 +552,7 @@
     bgProgressFill.style.width = '0%';
 
     removeFn(originalBlob, {
+	  publicPath: 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/',
       progress: function(key, current, total) {
         var pct = total > 0 ? Math.round((current / total) * 100) : 0;
         bgProgressFill.style.width = pct + '%';
