@@ -14,9 +14,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="manifest" href="./manifest.json" />
 
-  <!-- BG removal library loaded as plain UMD script — no modules, works in all PWA contexts -->
-  <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/background-removal.js"></script>
-
   <!-- Catch install prompt early, before any deferred scripts -->
   <script>
     window.deferredPrompt = null;
@@ -390,7 +387,9 @@
 
 <div id="toast"><span id="toast-msg"></span></div>
 
-<script>
+<script type="module">
+  import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm';
+
   // ── State ─────────────────────────────────────────────────
   var stream       = null;
   var facingMode   = 'environment';
@@ -535,24 +534,13 @@
   // ── Background Removal ────────────────────────────────────
   bgRemoveBtn.addEventListener('click', function() {
     if (!originalBlob) return;
-
-    // Check the UMD library loaded correctly
-    vvar imgly = window.BackgroundRemoval;
-	var removeFn = imgly && imgly.removeBackground;
-
-    if (typeof removeFn !== 'function') {
-      showToast('BG removal unavailable — check connection', true);
-      return;
-    }
-
     bgRemoveBtn.disabled = true;
     bgRemoveBtn.textContent = '⏳ Processing…';
     bgProgress.classList.add('visible');
     bgProgressLabel.textContent = 'Loading model…';
     bgProgressFill.style.width = '0%';
+    removeBackground(originalBlob, {
 
-    removeFn(originalBlob, {
-	  publicPath: 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/',
       progress: function(key, current, total) {
         var pct = total > 0 ? Math.round((current / total) * 100) : 0;
         bgProgressFill.style.width = pct + '%';
