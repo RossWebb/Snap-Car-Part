@@ -1,4 +1,4 @@
-const CACHE = 'partsnap-v1.8';
+const CACHE = 'partsnap-v1.9';
 
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));
