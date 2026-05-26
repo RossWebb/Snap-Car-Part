@@ -238,6 +238,7 @@
       transition: border-color .2s; backdrop-filter: blur(6px);
     }
     .retake-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+    .retake-btn:disabled { opacity: .35; cursor: not-allowed; pointer-events: none; }
 
     /* BG removal */
     .bg-row { display: flex; gap: 10px; align-items: stretch; }
@@ -278,6 +279,36 @@
     .bg-progress-fill {
       height: 100%; width: 0%; background: var(--accent);
       border-radius: 2px; transition: width .25s ease;
+    }
+
+    /* ── AUTO-REMOVE TOGGLE ── */
+    .auto-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .auto-row-label {
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: .8px; text-transform: uppercase; color: var(--muted);
+    }
+    /* toggle switch */
+    .toggle-wrap { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute; inset: 0; border-radius: 12px;
+      background: var(--border); cursor: pointer;
+      transition: background .2s;
+    }
+    .toggle-track::after {
+      content: ''; position: absolute;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--muted); transition: transform .2s, background .2s;
+    }
+    .toggle-wrap input:checked + .toggle-track { background: var(--accent); }
+    .toggle-wrap input:checked + .toggle-track::after {
+      transform: translateX(18px); background: #0d0d0f;
     }
 
     /* Part ID */
@@ -364,6 +395,16 @@
         <span class="preview-badge" id="preview-badge">CAPTURED</span>
         <button class="retake-btn" id="retake-btn">↩ Retake</button>
       </div>
+
+      <!-- Auto-remove toggle -->
+      <div class="auto-row">
+        <span class="auto-row-label">Auto remove background</span>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="auto-bg-toggle" />
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+
       <div class="bg-row">
         <button id="bg-remove-btn">✂ Remove Background</button>
         <button id="undo-btn">↩ Undo</button>
@@ -396,6 +437,7 @@
   var originalBlob = null;
   var currentBlob  = null;
   var bgRemoved    = false;
+  var bgProcessing = false;
 
   // ── DOM refs ──────────────────────────────────────────────
   var video           = document.getElementById('video');
@@ -422,8 +464,15 @@
   var bgProgress      = document.getElementById('bg-progress');
   var bgProgressLabel = document.getElementById('bg-progress-label');
   var bgProgressFill  = document.getElementById('bg-progress-fill');
+  var autoToggle      = document.getElementById('auto-bg-toggle');
   var toast           = document.getElementById('toast');
   var toastMsg        = document.getElementById('toast-msg');
+
+  // ── Auto-remove toggle (persisted) ───────────────────────
+  autoToggle.checked = localStorage.getItem('autoRemoveBg') === 'true';
+  autoToggle.addEventListener('change', function() {
+    localStorage.setItem('autoRemoveBg', autoToggle.checked);
+  });
 
   // ── Camera ────────────────────────────────────────────────
   function startCamera() {
@@ -502,6 +551,10 @@
     saveBtn.disabled = true;
     resetBgUI();
     setTimeout(function() { partIdInput.focus(); }, 300);
+    // Auto-remove if toggle is on
+    if (autoToggle.checked) {
+      startBgRemoval();
+    }
   }
 
   function showCamScreen() {
@@ -510,6 +563,7 @@
     if (previewImg._url) URL.revokeObjectURL(previewImg._url);
     originalBlob = null;
     currentBlob  = null;
+    bgProcessing = false;
   }
 
   retakeBtn.addEventListener('click', showCamScreen);
@@ -522,7 +576,12 @@
 
   function updateFilename() {
     var raw = partIdInput.value.trim();
-    saveBtn.disabled = raw.length === 0;
+    // When auto-processing, save stays disabled until removal is done
+    if (raw.length === 0 || bgProcessing) {
+      saveBtn.disabled = true;
+    } else {
+      saveBtn.disabled = false;
+    }
     if (raw) {
       var safe = raw.replace(/[^a-zA-Z0-9\-_.]/g, '_');
       filenamePreview.textContent = safe + '.' + (bgRemoved ? 'png' : 'jpg');
@@ -532,15 +591,19 @@
   }
 
   // ── Background Removal ────────────────────────────────────
-  bgRemoveBtn.addEventListener('click', function() {
+  function startBgRemoval() {
     if (!originalBlob) return;
+    bgProcessing = true;
+    retakeBtn.disabled = true;
     bgRemoveBtn.disabled = true;
     bgRemoveBtn.textContent = '⏳ Processing…';
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Processing…';
     bgProgress.classList.add('visible');
     bgProgressLabel.textContent = 'Loading model…';
     bgProgressFill.style.width = '0%';
-    removeBackground(originalBlob, {
 
+    removeBackground(originalBlob, {
       progress: function(key, current, total) {
         var pct = total > 0 ? Math.round((current / total) * 100) : 0;
         bgProgressFill.style.width = pct + '%';
@@ -549,6 +612,7 @@
           : 'Removing background… ' + pct + '%';
       }
     }).then(function(resultBlob) {
+      bgProcessing = false;
       currentBlob = resultBlob;
       bgRemoved   = true;
       setPreview(resultBlob);
@@ -557,17 +621,28 @@
       bgRemoveBtn.textContent  = '✓ Background Removed';
       bgRemoveBtn.classList.add('done');
       bgRemoveBtn.disabled = true;
+      retakeBtn.disabled = false;
       undoBtn.classList.add('visible');
       bgProgress.classList.remove('visible');
-      updateFilename();
+      saveBtn.textContent = 'Save Part Photo';
+      updateFilename(); // re-evaluates saveBtn.disabled based on partIdInput
       showToast('Background removed ✓');
     }).catch(function(err) {
       console.error(err);
+      bgProcessing = false;
       bgProgress.classList.remove('visible');
       bgRemoveBtn.disabled = false;
       bgRemoveBtn.textContent = '✂ Remove Background';
-      showToast('Background removal failed', true);
+      retakeBtn.disabled = false;
+      saveBtn.textContent = 'Save Part Photo';
+      updateFilename(); // allow saving original on failure
+      showToast('Background removal failed — original kept', true);
     });
+  }
+
+  bgRemoveBtn.addEventListener('click', function() {
+    if (!originalBlob || bgProcessing) return;
+    startBgRemoval();
   });
 
   undoBtn.addEventListener('click', function() {
@@ -579,18 +654,21 @@
   });
 
   function resetBgUI() {
+    bgProcessing = false;
     previewWrap.classList.remove('transparent-bg');
     previewBadge.textContent = 'CAPTURED';
     bgRemoveBtn.textContent  = '✂ Remove Background';
     bgRemoveBtn.classList.remove('done');
     bgRemoveBtn.disabled = false;
+    retakeBtn.disabled = false;
     undoBtn.classList.remove('visible');
     bgProgress.classList.remove('visible');
+    saveBtn.textContent = 'Save Part Photo';
   }
 
   // ── Save / Download ───────────────────────────────────────
   saveBtn.addEventListener('click', function() {
-    if (!currentBlob || !partIdInput.value.trim()) return;
+    if (!currentBlob || !partIdInput.value.trim() || bgProcessing) return;
     var safe     = partIdInput.value.trim().replace(/[^a-zA-Z0-9\-_.]/g, '_');
     var filename = safe + '.' + (bgRemoved ? 'png' : 'jpg');
 
